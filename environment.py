@@ -1,15 +1,21 @@
 import random
 
+"""
+  val_max: max value of the cell inclusive
+  regen_wait: how many turns until empty cell regenerates
+  fav_max: maximum amount a val can be favored when regenerated
+"""
 class Cell:
     def __init__(self, val_max, regen_wait, fav_max):
         self.val = random.randint(0, val_max)
         self.val_max = val_max
         self.regen_wait = regen_wait
-        self.regen_count = 0
+        self.regen_count = 0 # counter for determining when to regen
         self.fav_max = fav_max
-        self.fav_lvl = 0
+        self.fav_lvl = 0 # level of favoritism
         self.fav = None
 
+    # val is replaced with -1 (empty), and chance of fav being regenerated increased
     def consume(self, fav):
         if self.val != -1:
             if self.fav == fav:
@@ -30,6 +36,7 @@ class Cell:
             return False
         return True
 
+    # replace -1 with a new val
     def regen(self):
         ri = random.randint(0, self.val_max)
         if ri <= self.fav_lvl:
@@ -39,7 +46,6 @@ class Cell:
             remaining_vals.remove(self.fav)
             self.val = random.choice(remaining_vals)
 
-
 class GridEnv:
     def __init__(self, width=10, height=10, cell_max=9, regen_wait=3, fav_max=4):
         if fav_max > cell_max:
@@ -47,19 +53,23 @@ class GridEnv:
         self.width = width
         self.height = height
         self.state = [[Cell(cell_max, regen_wait, fav_max) for _ in range(height)] for _ in range(width)]
-        self.tracked_cells = []
-        self.agents = {}
+        self.tracked_cells = [] # only need to update empty cells, track these cells
+        self.agents = {} # keep track of multiple agents
 
     def __str__(self):
         row_strings = []
         for y in range(self.height):
             row_string = ''
             for x in range(self.width - 1):
-                row_string += str(self.state[x][y].val) + ','
+                if self.state[x+1][y].val < 0:
+                    row_string += str(self.state[x][y].val) + ','
+                else:
+                    row_string += str(self.state[x][y].val) + ', '
             row_string += str(self.state[self.width - 1][y].val) + '\n'
             row_strings.append(row_string)
         return ''.join(row_strings)
     
+    # initialize a new agent
     def add_agent(self, id, vis):
         while True:
             x_pos = random.randint(0, self.width - 1)
@@ -71,9 +81,9 @@ class GridEnv:
             if b:
                 self.agents[id] = (x_pos, y_pos, vis)
                 break
-        return self.get_view(x_pos, y_pos, vis)
+        return self.get_obs(x_pos, y_pos, vis)
 
-    # TODO: add move_agents function
+    # TODO: add function to move multiple agents
     def move_agent(self, id, move, fav):
         try:
             x_pos = (self.agents[id][0] + move[0]) % self.width
@@ -87,17 +97,18 @@ class GridEnv:
         self.update_tracked_cells(self.state[x_pos][y_pos])
         self.state[x_pos][y_pos].consume(fav)
 
-        return self.get_view(x_pos, y_pos, self.agents[id][2])
+        return self.get_obs(x_pos, y_pos, self.agents[id][2])
     
-    def get_view(self, x_pos, y_pos, vis):
+    # get an observation of a grid area
+    def get_obs(self, x_pos, y_pos, vis):
         x_start = (x_pos - vis) % self.width
         y_start = (y_pos - vis) % self.height
         vis_dim = vis * 2 + 1
-        view = [[None for _ in range(vis_dim)] for _ in range(vis_dim)]
+        obs = [[None for _ in range(vis_dim)] for _ in range(vis_dim)]
         for j, y in enumerate(range(y_start, y_start + vis_dim)):
             for k, x in enumerate(range(x_start, x_start + vis_dim)):
-                view[j][k] = self.state[x % self.width][y % self.height].val
-        return view
+                obs[j][k] = self.state[x % self.width][y % self.height].val
+        return obs
     
     def update_tracked_cells(self, cell):
         tracked_cells_new = []
