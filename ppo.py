@@ -1,5 +1,5 @@
 from tinygrad import Tensor, nn
-from environment import GridEnv
+from environment import MultiEnv
 from agent import Agent
 from policyNet import policyNet
 from valueNet import valueNet
@@ -26,8 +26,8 @@ NUM_MBATCH = (N*T)/MBATCH_SIZE # number of mini-batches per epoch
 LR = .001 # learning rate
 
 
-env = GridEnv(ENV_W, ENV_H, CELL_MAX, REGEN_WAIT, FAV_MAX)
-agent = Agent('a', AGENT_VIS, AGENT_REACH, FAV_MAX)
+env = MultiEnv(ENV_W, ENV_H, CELL_MAX, REGEN_WAIT, FAV_MAX)
+agent = Agent('a', AGENT_VIS, AGENT_REACH, REWARD_KEY)
 env.add_agent(agent)
 
 state_space = (AGENT_VIS * 2 + 1)**2
@@ -41,7 +41,7 @@ train_data = []
 
 def get_train_data():
     print('State 0')
-    print(env)
+    env.print_env()
     # TODO: multiple agents in env, env randomly initialized for each agent
     for t in range(1,T+1):
         state = Tensor(env.get_agent_state(agent.id)).flatten().reshape(1, state_space)
@@ -50,10 +50,8 @@ def get_train_data():
         move = int(action_net / (CELL_MAX + 1))
         fav = action_net % (CELL_MAX + 1)
         action = (move, fav)
-        env.step(agent.id, action)
+        env.step(action, agent.id)
         print(f'State {t}, Agent Position: {agent.x_pos}, {agent.y_pos}')
-        print(env)
-
-
+        env.print_env()
 
 get_train_data()

@@ -44,43 +44,46 @@ class Cell:
             remaining_vals.remove(self.fav)
             self.val = random.choice(remaining_vals)
 
-class GridEnv:
-    def __init__(self, width=10, height=10, cell_max=9, regen_wait=3, fav_max=4):
+class MultiEnv:
+    def __init__(self, width=10, height=10, cell_max=9, regen_wait=3, fav_max=4, num_env=1):
         if fav_max > cell_max:
             raise ValueError("fav_max must be leq to cell_max")
         self.width = width
         self.height = height
-        self.state = [[Cell(cell_max, regen_wait, fav_max) for _ in range(height)] for _ in range(width)]
-        self.tracked_cells = [] # only need to update empty cells, track these cells
-        self.agents = {} # keep track of multiple agents
+        self.state = [[[Cell(cell_max, regen_wait, fav_max) for _ in range(height)] for _ in range(width)] for _ in range(num_env)]
+        self.tracked_cells = [[] for _ in range(num_env)] # only need to update empty cells, track these cells
+        self.agents =[{} for _ in range(num_env)] # keep track of multiple agents
         self.moveLib = {0:(0,0),1:(1,0),2:(1,-1),3:(0,-1),4:(-1,-1),5:(-1,0),6:(-1,1),7:(0,1),8:(1,1)}
-
-    def __str__(self):
+    
+    def print_env(self, state_id=0):
         row_strings = []
         for y in range(self.height):
-            row_string = ''
+            if self.state[state_id][0][y].val < 0:
+                row_string = ''
+            else:
+                row_string = ' '
             for x in range(self.width - 1):
-                if self.state[x+1][y].val < 0:
-                    row_string += str(self.state[x][y].val) + ','
+                if self.state[state_id][x+1][y].val < 0:
+                    row_string += str(self.state[state_id][x][y].val) + ','
                 else:
-                    row_string += str(self.state[x][y].val) + ', '
-            row_string += str(self.state[self.width - 1][y].val) + '\n'
+                    row_string += str(self.state[state_id][x][y].val) + ', '
+            row_string += str(self.state[state_id][self.width - 1][y].val) + '\n'
             row_strings.append(row_string)
-        return ''.join(row_strings)
+        print(''.join(row_strings))
     
-    def add_agent(self, agent):
-        if agent.id in self.agents.keys():
+    def add_agent(self, agent, state_id=0):
+        if agent.id in self.agents[state_id].keys():
             raise ValueError("agent needs a unique id")
 
         x_pos = random.randint(0, self.width - 1)
         y_pos = random.randint(0, self.height - 1)
         agent.update_pos(x_pos, y_pos)
-        self.agents[agent.id] = agent
+        self.agents[state_id][agent.id] = agent
 
     # TODO: add function to move multiple agents
-    def step(self, id, action): # action: (move_id, fav)
+    def step(self, action, agent_id, state_id=0): # action: (move_id, fav)
         try:
-            x_pos, y_pos = self.agents[id].get_pos()
+            x_pos, y_pos = self.agents[state_id][agent_id].get_pos()
         except KeyError:
             print("agent id not found")
 
@@ -90,33 +93,33 @@ class GridEnv:
         x_pos = (x_pos + move[0]) % self.width
         y_pos = (y_pos + move[1]) % self.height
 
-        self.agents[id].update_pos(x_pos, y_pos)
-        self.update_tracked_cells(self.state[x_pos][y_pos], fav)
-        return self.get_agent_state(id)
+        self.agents[state_id][agent_id].update_pos(x_pos, y_pos)
+        self._update_tracked_cells(self.state[state_id][x_pos][y_pos], fav, state_id)
+        return self.get_agent_state(agent_id, state_id)
      
-    def get_agent_state(self, id):
+    def get_agent_state(self, agent_id, state_id=0):
         # get an agent's current state
         try:
-            x_pos, y_pos = self.agents[id].get_pos()
+            x_pos, y_pos = self.agents[state_id][agent_id].get_pos()
         except KeyError:
             print("agent id not found")
 
-        x_start = (x_pos - self.agents[id].vis) % self.width
-        y_start = (y_pos - self.agents[id].vis) % self.height
-        vis_dim = self.agents[id].vis * 2 + 1
+        x_start = (x_pos - self.agents[state_id][agent_id].vis) % self.width
+        y_start = (y_pos - self.agents[state_id][agent_id].vis) % self.height
+        vis_dim = self.agents[state_id][agent_id].vis * 2 + 1
         s = [[None for _ in range(vis_dim)] for _ in range(vis_dim)]
         for j, y in enumerate(range(y_start, y_start + vis_dim)):
             for k, x in enumerate(range(x_start, x_start + vis_dim)):
-                s[j][k] = self.state[x % self.width][y % self.height].val
+                s[j][k] = self.state[state_id][x % self.width][y % self.height].val
         return s
     
-    def update_tracked_cells(self, cell, fav):
+    def _update_tracked_cells(self, cell, fav, state_id):
         tracked_cells_new = []
-        for tc in self.tracked_cells:
+        for tc in self.tracked_cells[state_id]:
             if tc != cell:
                 if tc.update():
                     tracked_cells_new.append(tc)
         cell.regen_count = 0
         cell.consume(fav)
         tracked_cells_new.append(cell)
-        self.tracked_cells = tracked_cells_new
+        self.tracked_cells[state_id] = tracked_cells_new
