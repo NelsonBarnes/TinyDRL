@@ -1,5 +1,5 @@
-from environment import MultiEnv
-from agent import Agent
+from key_collector_game.env import MultiEnv
+from key_collector_game.agent import Agent
 
 ENV_W = 10
 ENV_H = 10

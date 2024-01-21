@@ -1,6 +1,6 @@
 from tinygrad import Tensor, nn
-from environment import MultiEnv
-from agent import Agent
+from key_collector_game.env import MultiEnv
+from key_collector_game.agent import Agent
 from policyNet import policyNet
 from valueNet import valueNet
 #import math
