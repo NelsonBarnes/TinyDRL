@@ -32,4 +32,4 @@ class Agent:
             if (self.resources[-kl:] == self.key):
                 return 1 # max reward
 
-        return -.1 # small negative reward
+        return -.01 # small negative reward
